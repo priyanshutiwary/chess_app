@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Switch } from "@/components/ui/switch"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { motion, AnimatePresence } from "framer-motion"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 const pieces = {
   'w': {
@@ -56,6 +57,7 @@ export function EnhancedChessGame() {
   const [movesCount, setMovesCount] = useState({ w: 0, b: 0 })
   const [isTimedMode, setIsTimedMode] = useState(false)
   const [moveHistory, setMoveHistory] = useState<Move[]>([])
+  const [gameMode, setGameMode] = useState<'single' | 'two'>('single')
 
   const isKingInCheck = useCallback((board: Square[][], color: 'w' | 'b'): boolean => {
     let kingPosition: [number, number] | null = null;
@@ -237,17 +239,15 @@ export function EnhancedChessGame() {
       [currentPlayer]: prev[currentPlayer] + 1
     }))
 
-    // Add move to history
     setMoveHistory((prev: Move[]) => [
       ...prev,
       {
         from: [startRow, startCol],
         to: [endRow, endCol],
         piece: piece!,
-        captured: capturedPiece as Piece | undefined, // Ensure `capturedPiece` is `Piece | undefined`
+        captured: capturedPiece as Piece,
       }
     ]);
-    
 
     const nextPlayer = currentPlayer === 'w' ? 'b' : 'w'
     if (isKingInCheck(newBoard, nextPlayer)) {
@@ -256,7 +256,6 @@ export function EnhancedChessGame() {
       setGameStatus('playing')
     }
 
-    // Check if either player has run out of time in timed mode
     if (isTimedMode && (whiteTime <= 0 || blackTime <= 0)) {
       setIsGameOver(true)
       setGameStatus('checkmate')
@@ -264,7 +263,7 @@ export function EnhancedChessGame() {
   }, [board, currentPlayer, isKingInCheck, whiteTime, blackTime, isTimedMode])
 
   const handleSquareClick = useCallback((row: number, col: number) => {
-    if (currentPlayer === 'b' || isGameOver) return; // Prevent moves during computer's turn or when game is over
+    if ((gameMode === 'single' && currentPlayer === 'b') || isGameOver) return;
 
     if (selectedPiece) {
       if (validMoves.some(([r, c]) => r === row && c === col)) {
@@ -278,7 +277,7 @@ export function EnhancedChessGame() {
         setValidMoves(getValidMoves(row, col, board))
       }
     }
-  }, [board, currentPlayer, selectedPiece, validMoves, getValidMoves, makeMove, isGameOver])
+  }, [board, currentPlayer, selectedPiece, validMoves, getValidMoves, makeMove, isGameOver, gameMode])
 
   const computerMove = useCallback(() => {
     setIsComputerThinking(true)
@@ -300,7 +299,7 @@ export function EnhancedChessGame() {
         makeMove(randomMove.start[0], randomMove.start[1], randomMove.end[0], randomMove.end[1])
       }
       setIsComputerThinking(false)
-    }, 1000) // Simulate thinking time
+    }, 1000)
   }, [board, getValidMoves, makeMove])
 
   useEffect(() => {
@@ -319,6 +318,8 @@ export function EnhancedChessGame() {
         if (hasValidMoves) break;
       }
 
+      
+
       if (!hasValidMoves) {
         if  (isKingInCheck(board, currentPlayer)) {
           setGameStatus('checkmate');
@@ -332,11 +333,10 @@ export function EnhancedChessGame() {
 
     checkGameStatus();
 
-    // Trigger computer move if it's black's turn
-    if (currentPlayer === 'b' && gameStatus === 'playing' && !isGameOver) {
+    if (gameMode === 'single' && currentPlayer === 'b' && gameStatus === 'playing' && !isGameOver) {
       computerMove();
     }
-  }, [board, currentPlayer, getValidMoves, isKingInCheck, gameStatus, computerMove, isGameOver]);
+  }, [board, currentPlayer, getValidMoves, isKingInCheck, gameStatus, computerMove, isGameOver, gameMode]);
 
   useEffect(() => {
     let timer: NodeJS.Timeout
@@ -403,9 +403,9 @@ export function EnhancedChessGame() {
           <CardContent>
             <div className="mb-4 text-2xl font-semibold text-center text-gray-700">
               {gameStatus === 'playing' && !isGameOver && (
-                isComputerThinking 
+                gameMode === 'single' && isComputerThinking 
                   ? <span className="text-blue-500">Computer is thinking...</span>
-                  : `${currentPlayer === 'w' ? 'Your' : "Computer's"} Turn`
+                  : `${currentPlayer === 'w' ? 'White' : 'Black'}'s Turn`
               )}
               {gameStatus === 'check' && <span className="text-red-500">Check!</span>}
               {(gameStatus === 'checkmate' || isGameOver) && (
@@ -438,11 +438,11 @@ export function EnhancedChessGame() {
                         (lastMove.from[0] === rowIndex && lastMove.from[1] === colIndex) ||
                         (lastMove.to[0] === rowIndex && lastMove.to[1] === colIndex)
                       ) ? 'bg-yellow-200' : ''}
-                      ${currentPlayer === 'b' || isGameOver ? 'cursor-not-allowed' : 'hover:opacity-80'}
+                      ${(gameMode === 'single' && currentPlayer === 'b') || isGameOver ? 'cursor-not-allowed' : 'hover:opacity-80'}
                     `}
                     onClick={() => handleSquareClick(rowIndex, colIndex)}
-                    whileHover={{ scale: currentPlayer === 'w' && !isGameOver ? 1.05 : 1 }}
-                    whileTap={{ scale: currentPlayer === 'w' && !isGameOver ? 0.95 : 1 }}
+                    whileHover={{ scale: (gameMode === 'two' || (gameMode === 'single' && currentPlayer === 'w')) && !isGameOver ? 1.05 : 1 }}
+                    whileTap={{ scale: (gameMode === 'two' || (gameMode === 'single' && currentPlayer === 'w')) && !isGameOver ? 0.95 : 1 }}
                     role="gridcell"
                     aria-label={`${square ? `${square.color === 'w' ? 'White' : 'Black'} ${square.type}` : 'Empty square'} at row ${rowIndex + 1}, column ${colIndex + 1}`}
                     tabIndex={0}
@@ -483,7 +483,7 @@ export function EnhancedChessGame() {
               <h2 className="text-xl font-semibold mb-2 text-gray-700">Captured Pieces</h2>
               <div className="flex flex-col gap-2">
                 <div>
-                  <h3 className="font-medium mb-1 text-gray-600">White (You)</h3>
+                  <h3 className="font-medium mb-1 text-gray-600">White</h3>
                   <div className="flex flex-wrap gap-1">
                     <AnimatePresence>
                       {capturedPieces.b.map((piece, index) => (
@@ -501,7 +501,7 @@ export function EnhancedChessGame() {
                   </div>
                 </div>
                 <div>
-                  <h3 className="font-medium mb-1 text-gray-600">Black (Computer)</h3>
+                  <h3 className="font-medium mb-1 text-gray-600">Black</h3>
                   <div className="flex flex-wrap gap-1">
                     <AnimatePresence>
                       {capturedPieces.w.map((piece, index) => (
@@ -548,9 +548,25 @@ export function EnhancedChessGame() {
               Timed Mode (30 minutes)
             </label>
           </div>
+          <Select
+            value={gameMode}
+            onValueChange={(value: 'single' | 'two') => {
+              setGameMode(value)
+              resetGame()
+            }}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select game mode" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="single">Single Player</SelectItem>
+              <SelectItem value="two">Two Players</SelectItem>
+            </SelectContent>
+          </Select>
           <Button className="w-full text-lg py-6" onClick={resetGame}>New Game</Button>
         </div>
       </div>
     </div>
   )
 }
+export default EnhancedChessGame
