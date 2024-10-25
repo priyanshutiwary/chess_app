@@ -238,12 +238,16 @@ export function EnhancedChessGame() {
     }))
 
     // Add move to history
-    setMoveHistory(prev => [...prev, {
-      from: [startRow, startCol],
-      to: [endRow, endCol],
-      piece: piece!,
-      captured: capturedPiece
-    }])
+    setMoveHistory((prev: Move[]) => [
+      ...prev,
+      {
+        from: [startRow, startCol],
+        to: [endRow, endCol],
+        piece: piece!,
+        captured: capturedPiece as Piece | undefined, // Ensure `capturedPiece` is `Piece | undefined`
+      }
+    ]);
+    
 
     const nextPlayer = currentPlayer === 'w' ? 'b' : 'w'
     if (isKingInCheck(newBoard, nextPlayer)) {
